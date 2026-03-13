@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔍 Base Mini App Monitor</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'SF Mono', 'Monaco', 'Consolas', monospace; background: #0d0d0d; color: #e0e0e0; min-height: 100vh; padding: 20px; }
+        .container { max-width: 800px; margin: 0 auto; }
+        h1 { color: #fff; font-size: 2rem; margin-bottom: 10px; }
+        .tagline { color: #888; margin-bottom: 30px; }
+        .card { background: #16161f; border-radius: 12px; padding: 25px; margin: 20px 0; border: 1px solid #2a2a3a; }
+        .card h2 { color: #fff; font-size: 1.2rem; margin-bottom: 15px; }
+        
+        .block-display { text-align: center; padding: 20px; background: #1a1a2e; border-radius: 8px; margin-bottom: 20px; }
+        .block-number { font-size: 2rem; color: #00ff88; font-weight: bold; }
+        .block-label { color: #666; font-size: 0.9rem; }
+        
+        .app-list { list-style: none; }
+        .app-item { background: #0a0a0f; padding: 15px; border-radius: 8px; margin-bottom: 10px; border-left: 3px solid #00ff88; }
+        .app-item.warning { border-left-color: #ffaa00; }
+        .app-name { color: #fff; font-weight: bold; margin-bottom: 5px; }
+        .app-address { color: #666; font-size: 0.8rem; word-break: break-all; }
+        
+        .input-group { display: flex; gap: 10px; margin-top: 20px; }
+        input { flex: 1; background: #0a0a0f; border: 1px solid #2a2a3a; color: #e0e0e0; padding: 12px; border-radius: 6px; font-family: inherit; }
+        input:focus { outline: none; border-color: #0052ff; }
+        button { background: #0052ff; color: #fff; border: none; padding: 12px 24px; border-radius: 6px; cursor: pointer; font-weight: 500; }
+        button:hover { background: #2266ff; }
+        
+        .result { margin-top: 20px; padding: 15px; background: #1a1a2e; border-radius: 8px; display: none; }
+        .result.show { display: block; }
+        .result.contract { border-left: 3px solid #00ff88; }
+        .result.eoa { border-left: 3px solid #ffaa00; }
+        
+        .badge { display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: bold; margin-left: 10px; }
+        .badge.contract { background: #00ff8822; color: #00ff88; }
+        .badge.eoa { background: #ffaa0022; color: #ffaa00; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Base Mini App Monitor</h1>
+        <p class="tagline">Check if a Base address is a smart contract or wallet (EOA)</p>
+        
+        <div class="card">
+            <h2>⛓️ Latest Block</h2>
+            <div class="block-display">
+                <div class="block-number" id="block-number">Loading...</div>
+                <div class="block-label">Base Mainnet</div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <h2>🔎 Check Address</h2>
+            <div class="input-group">
+                <input type="text" id="address-input" placeholder="Enter Base address (0x...)">
+                <button onclick="checkAddress()">Check</button>
+            </div>
+            <div class="result" id="result">
+                <div id="result-content"></div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <h2>📱 Sample Mini Apps</h2>
+            <ul class="app-list" id="app-list">
+                <li>Loading...</li>
+            </ul>
+        </div>
+    </div>
+    
+    <script>
+        const RPC_URL = 'https://mainnet.base.org';
+        
+        async function fetchJSON(method, params = []) {
+            const resp = await fetch(RPC_URL, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({jsonrpc: '2.0', method, params, id: 1})
+            });
+            const data = await resp.json();
+            return data.result;
+        }
+        
+        async function loadBlock() {
+            try {
+                const block = await fetchJSON('eth_blockNumber');
+                const num = parseInt(block, 16);
+                document.getElementById('block-number').textContent = num.toLocaleString();
+            } catch(e) {
+                document.getElementById('block-number').textContent = 'Error';
+            }
+        }
+        
+        async function checkAddress() {
+            const addr = document.getElementById('address-input').value.trim();
+            if (!addr) return;
+            
+            const resultDiv = document.getElementById('result');
+            const contentDiv = document.getElementById('result-content');
+            
+            resultDiv.className = 'result show';
+            contentDiv.innerHTML = 'Checking...';
+            
+            try {
+                const code = await fetchJSON('eth_getCode', [addr, 'latest']);
+                const isContract = code !== '0x' && code !== '0x0';
+                
+                if (isContract) {
+                    resultDiv.className = 'result show contract';
+                    contentDiv.innerHTML = `<strong>CONTRACT</strong><span class="badge contract">Smart Contract</span><br><small>${addr}</small>`;
+                } else {
+                    resultDiv.className = 'result show eoa';
+                    contentDiv.innerHTML = `<strong>EOA</strong><span class="badge eoa">Wallet</span><br><small>${addr}</small>`;
+                }
+            } catch(e) {
+                contentDiv.innerHTML = 'Error checking address';
+            }
+        }
+        
+        async function loadSampleApps() {
+            const apps = [
+                {addr: '0x4ed4e862860bed51a9570b96d89af5e1b0efefed', name: 'Degen.Fun'},
+                {addr: '0x3f5CE5FBFe3E9df39706aB6CB2a8d0fd67B6B1B7', name: 'Uniswap V3'},
+            ];
+            
+            const list = document.getElementById('app-list');
+            list.innerHTML = '';
+            
+            for (const app of apps) {
+                try {
+                    const code = await fetchJSON('eth_getCode', [app.addr, 'latest']);
+                    const isContract = code !== '0x' && code !== '0x0';
+                    
+                    const li = document.createElement('li');
+                    li.className = 'app-item' + (isContract ? '' : ' warning');
+                    li.innerHTML = `
+                        <div class="app-name">${app.name} ${isContract ? '✅' : '⚠️'}</div>
+                        <div class="app-address">${app.addr}</div>
+                    `;
+                    list.appendChild(li);
+                } catch(e) {
+                    console.log(e);
+                }
+            }
+        }
+        
+        loadBlock();
+        loadSampleApps();
+        setInterval(loadBlock, 15000);
+    </script>
+</body>
+</html>
